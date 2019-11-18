@@ -9,7 +9,7 @@ server = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
 server.bind(('::1', 8888))  # 绑定ip地址和端口
 server.listen()  # 开启监听
 print('Listening...')
-buffer = 1024  # 缓冲区大小，这里好像因为windows的系统的原因，这个接收的缓冲区不能太大
+buffer = 1024  # 缓冲区大小
 conn, addr = server.accept()
 
 # 先接收报头的长度
@@ -29,16 +29,19 @@ print("A request try to send you of a file: accept or not[y/n]? ")
 print("Requset IP:'{}'".format(addr[0]))
 print("Filename:{}".format(file_name))
 print("Filesize:{} bytes".format(file_size))
-if_recv = input("Accept or not [y/n]?")
+if_recv = input("Accept or not [y/n]?\n")
 assert (if_recv=='y' or if_recv=='n')
 server2.send(if_recv.encode('utf-8'))
+
+# 发送速度要求
+speed = input('Speed(kb/s):\n')
+server2.send(speed.encode('utf-8'))
 server2.close()
 
 bags_nums = file_size//buffer
 if not if_recv=='n':
-    print('Receiving...')
     with open('recv.zip', 'wb') as f:
-        for i in tqdm(range(bags_nums)):
+        for i in tqdm(range(bags_nums), ncols=100, desc="Receiving", unit='kb'):
             content = conn.recv(buffer)
             f.write(content)
             file_size -= buffer

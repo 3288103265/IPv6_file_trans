@@ -3,6 +3,7 @@ import os
 import socket
 import struct
 import zlib
+from time import sleep, time
 
 from tqdm import tqdm
 
@@ -12,12 +13,11 @@ listener = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
 listener.bind(('::1', 8887))
 buffer = 1024
 
-# 定制我们的报头，这里的报头不是唯一的，你可以根据你的想法去更改
+# 报头信息。
 head = {'filepath': r'D:\PythonFile\IPv6_file_trans',
-        'filename': r'faces.zip',
+        'filename': r'file.zip',
         'filesize': None,
         'CRC32': None}
-
 file_path = os.path.join(head['filepath'], head['filename'])
 
 # 计算文件的大小
@@ -26,7 +26,7 @@ head['filesize'] = file_size
 
 # 计算CRC32值并且和文件头里面的做比较。
 with open(file_path, 'rb') as f:
-    head['CRC32']=zlib.crc32(f.read())
+    head['CRC32'] = zlib.crc32(f.read())
 
 json_head = json.dumps(head)  # 利用json将字典转成字符串
 bytes_head = json_head.encode('utf-8')  # 字符串转bytes
@@ -43,18 +43,25 @@ sender.send(bytes_head)
 listener.listen()
 conn, addr = listener.accept()
 if_recv = conn.recv(1).decode('utf-8')
+speed = conn.recv(4).decode('utf-8')
+bags_per_second = int(speed)
 conn.close()
 listener.close()
 
 # 发送包的次数。每次发送一个buffer，剩下一个单独发送。
 bags_num = file_size // buffer
-if if_recv=='y':
-    print('Sending...')
+if if_recv == 'y':
     with open(file_path, 'rb') as f:
-        for i in tqdm(range(bags_num)):
-            content = f.read(buffer)  # 每次读取buffer字节大小内容
-            file_size -= buffer
-            sender.send(content)  # 发送读取的内容
+        start_time = time()
+        with tqdm(range(bags_num), desc="Sending", unit='kb', ncols=100) as t:
+            for i in t:
+                content = f.read(buffer)  # 每次读取buffer字节大小内容
+                file_size -= buffer
+                sender.send(content)  # 发送读取的内容
+                t.update()
+                if (i+1) % bags_per_second == 0:
+                    # 用来控制传输速度，每秒传输一定数量的包后就进入sleep模式。
+                    sleep(1.0 - ((time() - start_time) % 1.0))
         if file_size > 0:
             content = f.read(file_size)
             sender.send(content)
