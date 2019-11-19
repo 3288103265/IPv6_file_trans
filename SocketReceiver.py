@@ -44,37 +44,42 @@ def listen_sent_cmd(cmd_sender=server2):
     while True:
         input_kb = str(sys.stdin.readline()).strip("\n")
         if input_kb == 's':
-            print('KeyInterrupt: Stop the transmission.')
+            print('CMD: Stop the transmission.')
             cmd_sender.send(input_kb.encode('utf-8'))
             print('Enter "c" to continue.')
             print('Enter "t" to terminate.')
         elif input_kb == 'c':
             cmd_sender.send(input_kb.encode('utf-8'))
-            print('KeyInterrupt: Continue the transmission.')
+            print('\nCMD: Continue the transmission.')
         elif input_kb == 't':  # terminate
-            print('KeyInterrupt:Terminate the transmission.')
-            # TODO：remove file.
+            print('CMD:Terminate the transmission.')
+            sys.exit()
         else:
             print('Invalid keyboard command.\n')
             continue
 
 
-
+# 子线程为守护线程，当主线程结束时也结束。
+t1 = threading.Thread(target=listen_sent_cmd, name='cmd_sender')
+t1.setDaemon(True)
 
 # 开始接收
 bags_nums = file_size // buffer
 if not if_recv == 'n':
-    threading.Thread(target=listen_sent_cmd, name='cmd_sender').start()
-
+    t1.start()
+    thread_num1 = len(threading.enumerate())
     with open('recv.zip', 'wb') as f:
         for i in tqdm(range(bags_nums), ncols=100, desc="Receiving", unit='kb'):
             content = conn.recv(buffer)
             f.write(content)
             file_size -= buffer
+            if len(threading.enumerate())<= thread_num1:
+                sys.exit()
         if file_size > 0:
             content = conn.recv(file_size)
             f.write(content)
             file_size = 0
+
     # 校验文件
     with open('recv.zip', 'rb') as f:
         dst_crc32 = zlib.crc32(f.read())
@@ -82,6 +87,7 @@ if not if_recv == 'n':
         print('Receive {} successfully.'.format(file_name))
     else:
         print('File received invalid.')
+
 conn.close()
 server.close()
 server2.close()

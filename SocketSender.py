@@ -2,6 +2,7 @@ import json
 import os
 import socket
 import struct
+import sys
 import threading
 import zlib
 from time import sleep, time
@@ -54,7 +55,10 @@ event = threading.Event()
 def recv_cmd(conn=conn):
     event.set()
     while True:
-        remote_cmd = conn.recv(1).decode('utf-8')
+        try:
+            remote_cmd = conn.recv(1).decode('utf-8')
+        except ConnectionAbortedError:
+            sys.exit()
         if remote_cmd == 's':
             event.clear()
             print('\nStop the transmission process.')
@@ -63,7 +67,7 @@ def recv_cmd(conn=conn):
             print('\nContinue the transmission process.')
         else:
             print('\nEvent is set state, cannot continue.')
-            pass
+            exit()
 
 
 
@@ -74,16 +78,19 @@ if if_recv == 'y':
 
     with open(file_path, 'rb') as f:
         start_time = time()
-        with tqdm(range(bags_num), desc="Sending", unit='kb', ncols=100) as t:
-            for i in t:
-                content = f.read(buffer)  # 每次读取buffer字节大小内容
-                file_size -= buffer
-                sender.send(content)  # 发送读取的内容
-                t.update()
-                if (i + 1) % bags_per_second == 0:
-                    # 用来控制传输速度，每秒传输一定数量的包后就进入sleep模式。
-                    sleep(1.0 - ((time() - start_time) % 1.0))
-                event.wait()
+        try:
+            with tqdm(range(bags_num), desc="Sending", unit='kb', ncols=100) as t:
+                for i in t:
+                    content = f.read(buffer)  # 每次读取buffer字节大小内容
+                    file_size -= buffer
+                    sender.send(content)  # 发送读取的内容
+                    t.update()
+                    if (i + 1) % bags_per_second == 0:
+                        # 用来控制传输速度，每秒传输一定数量的包后就进入sleep模式。
+                        sleep(1.0 - ((time() - start_time) % 1.0))
+                    event.wait()
+        except ConnectionResetError:
+            sys.exit()
         if file_size > 0:
             content = f.read(file_size)
             sender.send(content)
