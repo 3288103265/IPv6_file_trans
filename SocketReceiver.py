@@ -1,6 +1,8 @@
 import socket
 import struct
 import json
+import sys
+import threading
 import zlib
 
 from tqdm import tqdm
@@ -30,16 +32,40 @@ print("Requset IP:'{}'".format(addr[0]))
 print("Filename:{}".format(file_name))
 print("Filesize:{} bytes".format(file_size))
 if_recv = input("Accept or not [y/n]?\n")
-assert (if_recv=='y' or if_recv=='n')
+assert (if_recv == 'y' or if_recv == 'n')
 server2.send(if_recv.encode('utf-8'))
 
 # 发送速度要求
 speed = input('Speed(kb/s):\n')
 server2.send(speed.encode('utf-8'))
-server2.close()
 
-bags_nums = file_size//buffer
-if not if_recv=='n':
+# 用来监听键盘的子进程。
+def listen_sent_cmd(cmd_sender=server2):
+    while True:
+        input_kb = str(sys.stdin.readline()).strip("\n")
+        if input_kb == 's':
+            print('KeyInterrupt: Stop the transmission.')
+            cmd_sender.send(input_kb.encode('utf-8'))
+            print('Enter "c" to continue.')
+            print('Enter "t" to terminate.')
+        elif input_kb == 'c':
+            cmd_sender.send(input_kb.encode('utf-8'))
+            print('KeyInterrupt: Continue the transmission.')
+        elif input_kb == 't':  # terminate
+            print('KeyInterrupt:Terminate the transmission.')
+            # TODO：remove file.
+        else:
+            print('Invalid keyboard command.\n')
+            continue
+
+
+
+
+# 开始接收
+bags_nums = file_size // buffer
+if not if_recv == 'n':
+    threading.Thread(target=listen_sent_cmd, name='cmd_sender').start()
+
     with open('recv.zip', 'wb') as f:
         for i in tqdm(range(bags_nums), ncols=100, desc="Receiving", unit='kb'):
             content = conn.recv(buffer)
@@ -49,12 +75,13 @@ if not if_recv=='n':
             content = conn.recv(file_size)
             f.write(content)
             file_size = 0
-
+    # 校验文件
     with open('recv.zip', 'rb') as f:
         dst_crc32 = zlib.crc32(f.read())
-    if dst_crc32==src_crc32:
+    if dst_crc32 == src_crc32:
         print('Receive {} successfully.'.format(file_name))
     else:
         print('File received invalid.')
 conn.close()
 server.close()
+server2.close()
