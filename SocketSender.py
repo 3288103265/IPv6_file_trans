@@ -16,7 +16,7 @@ listener.bind(('::1', 8887))
 buffer = 1024
 
 # 报头信息。
-head = {'filepath': r'D:\PythonFile\IPv6_file_trans',
+head = {'filepath': r'D:\PythonProject\IPv6_file_trans',
         'filename': r'file.zip',
         'filesize': None,
         'CRC32': None}
@@ -67,14 +67,16 @@ def recv_cmd(conn=conn):
             print('\nContinue the transmission process.')
         else:
             print('\nEvent is set state, cannot continue.')
-            exit()
+            continue
 
 
 
 # 发送包的次数。每次发送一个buffer，剩下一个单独发送。
 bags_num = file_size // buffer
 if if_recv == 'y':
-    threading.Thread(target=recv_cmd, name='Remote command').start()
+    t1 = threading.Thread(target=recv_cmd, name='Remote command')
+    t1.setDaemon(True)
+    t1.start()
 
     with open(file_path, 'rb') as f:
         start_time = time()
